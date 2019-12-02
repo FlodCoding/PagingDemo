@@ -18,6 +18,7 @@ package com.example.android.codelabs.paging.data
 
 import android.util.Log
 import androidx.lifecycle.MutableLiveData
+import androidx.paging.LivePagedListBuilder
 import com.example.android.codelabs.paging.api.GithubService
 import com.example.android.codelabs.paging.api.searchRepos
 import com.example.android.codelabs.paging.db.GithubLocalCache
@@ -27,12 +28,13 @@ import com.example.android.codelabs.paging.model.RepoSearchResult
  * Repository class that works with local and remote data sources.
  */
 class GithubRepository(
-    private val service: GithubService,
-    private val cache: GithubLocalCache
+        private val service: GithubService,
+        private val cache: GithubLocalCache
 ) {
 
     // keep the last requested page. When the request is successful, increment the page number.
     private var lastRequestedPage = 1
+
 
     // LiveData of network errors.
     private val networkErrors = MutableLiveData<String>()
@@ -45,18 +47,26 @@ class GithubRepository(
      */
     fun search(query: String): RepoSearchResult {
         Log.d("GithubRepository", "New query: $query")
-        lastRequestedPage = 1
-        requestAndSaveData(query)
+        // lastRequestedPage = 1
 
-        // Get data from the local cache
-        val data = cache.reposByName(query)
+        // Get data source factory from the local cache
+        val dataSourceFactory = cache.reposByName(query)
+
+        val boundaryCallback = RepoBoundaryCallback(query, service, cache)
+        val networkErrors = boundaryCallback.networkErrors
+
+        // Get the paged list
+        val data = LivePagedListBuilder(dataSourceFactory, DATABASE_PAGE_SIZE)
+                .setBoundaryCallback(boundaryCallback)
+                .build()
+
 
         return RepoSearchResult(data, networkErrors)
     }
 
-    fun requestMore(query: String) {
+   /* fun requestMore(query: String) {
         requestAndSaveData(query)
-    }
+    }*/
 
     private fun requestAndSaveData(query: String) {
         if (isRequestInProgress) return
@@ -75,5 +85,6 @@ class GithubRepository(
 
     companion object {
         private const val NETWORK_PAGE_SIZE = 50
+        private const val DATABASE_PAGE_SIZE = 20
     }
 }
